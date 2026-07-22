@@ -2,8 +2,9 @@ const router = require('express').Router();
 const db = require('../db');
 const { asyncHandler } = require('../http');
 
-// Expands non-recurring (unpaid only) and monthly-recurring transactions into
-// dated entries within the 13-week projection window.
+// Expands non-recurring (unpaid only) and recurring transactions into dated
+// entries within the 13-week projection window. Recurring rows step by their
+// frequency's interval from due_date until the window end (or recurrence_end).
 const entriesCte = `
   params AS (
     SELECT
@@ -20,14 +21,23 @@ const entriesCte = `
       AND due_date >= params.start_date
       AND due_date <= params.start_date + 90
     UNION ALL
-    SELECT t.is_income, t.amount, t.category, t.counterparty,
-      (t.due_date + (gs.n * INTERVAL '1 month'))::date AS effective_date
+    SELECT t.is_income, t.amount, t.category, t.counterparty, occ::date AS effective_date
     FROM transaction t
-    CROSS JOIN generate_series(0, 12) AS gs(n)
     CROSS JOIN params
-    WHERE t.recurrence = 'monthly'
-      AND (t.due_date + (gs.n * INTERVAL '1 month'))::date >= params.start_date
-      AND (t.due_date + (gs.n * INTERVAL '1 month'))::date <= params.start_date + 90
+    CROSS JOIN LATERAL (
+      SELECT CASE t.recurrence
+        WHEN 'weekly' THEN INTERVAL '1 week'
+        WHEN 'monthly' THEN INTERVAL '1 month'
+        WHEN 'quarterly' THEN INTERVAL '3 months'
+        WHEN 'annually' THEN INTERVAL '1 year'
+      END AS step
+    ) iv
+    CROSS JOIN LATERAL generate_series(
+      t.due_date::timestamp, (params.start_date + 90)::timestamp, iv.step
+    ) AS occ
+    WHERE t.recurrence IN ('weekly', 'monthly', 'quarterly', 'annually')
+      AND occ::date >= params.start_date
+      AND (t.recurrence_end IS NULL OR occ::date <= t.recurrence_end)
   )
 `;
 
