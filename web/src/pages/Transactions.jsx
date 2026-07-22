@@ -108,6 +108,20 @@ export default function Transactions() {
     load();
   }
 
+  // Mark the next occurrence of a recurring transaction as handled; the row's
+  // next due date then advances and the occurrence leaves the forecast.
+  async function clearNextOccurrence(row) {
+    await api.post(`/api/transactions/${row.id}/exceptions`, {
+      occurrence_date: row.next_due_date,
+    });
+    load();
+  }
+
+  async function undoLastException(row) {
+    await api.delete(`/api/transactions/${row.id}/exceptions/${row.last_exception_date}`);
+    load();
+  }
+
   const visible =
     filter === 'all'
       ? rows
@@ -253,6 +267,26 @@ export default function Transactions() {
                       >
                         {row.paid ? 'Paid' : 'Unpaid'}
                       </button>
+                    )}
+                    {row.recurrence && (
+                      <span className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => clearNextOccurrence(row)}
+                          title={`Mark the ${fmt(row.next_due_date)} occurrence as paid/skipped`}
+                          className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700"
+                        >
+                          ✓ {fmt(row.next_due_date)}
+                        </button>
+                        {row.exception_count > 0 && (
+                          <button
+                            onClick={() => undoLastException(row)}
+                            title={`Undo: restore the ${fmt(row.last_exception_date)} occurrence`}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            ↺
+                          </button>
+                        )}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">

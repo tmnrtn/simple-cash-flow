@@ -35,10 +35,16 @@ router.get(
       SELECT t.*, c.name AS category_name, p.name AS project_name,
         -- to_char keeps this a plain YYYY-MM-DD string, immune to the timezone
         -- shift the pg driver applies when parsing date columns into JS Dates.
-        to_char(COALESCE(nd.next_due, t.due_date), 'YYYY-MM-DD') AS next_due_date
+        to_char(COALESCE(nd.next_due, t.due_date), 'YYYY-MM-DD') AS next_due_date,
+        ex.exception_count,
+        to_char(ex.last_exception, 'YYYY-MM-DD') AS last_exception_date
       FROM transaction t
       LEFT JOIN category c ON t.category = c.id
       LEFT JOIN project p ON t.project_id = p.id
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS exception_count, MAX(occurrence_date) AS last_exception
+        FROM recurrence_exception re WHERE re.transaction_id = t.id
+      ) ex ON true
       LEFT JOIN LATERAL (
         SELECT MIN(gs)::date AS next_due
         FROM generate_series(
@@ -55,6 +61,11 @@ router.get(
         WHERE t.recurrence IS NOT NULL
           AND gs >= CURRENT_DATE
           AND (t.recurrence_end IS NULL OR gs <= t.recurrence_end)
+          -- Skip occurrences the user has marked handled.
+          AND NOT EXISTS (
+            SELECT 1 FROM recurrence_exception re
+            WHERE re.transaction_id = t.id AND re.occurrence_date = gs::date
+          )
       ) nd ON true
       ORDER BY COALESCE(nd.next_due, t.due_date), t.id
     `);
@@ -99,6 +110,41 @@ router.patch(
       id,
     ]);
     rows.length ? res.json(rows[0]) : res.status(404).json({ error: 'Not found' });
+  })
+);
+
+// Mark one occurrence of a recurring transaction as handled (paid/skipped).
+// It is then excluded from the projection and skipped for next_due_date.
+router.post(
+  '/:id/exceptions',
+  asyncHandler(async (req, res) => {
+    const id = v.id(req.params.id);
+    const occurrence_date = v.date(req.body.occurrence_date, 'occurrence_date');
+    const { rows } = await db.query('SELECT recurrence FROM transaction WHERE id = $1', [id]);
+    if (!rows.length) throw new ApiError(404, 'Not found');
+    if (!rows[0].recurrence) {
+      throw new ApiError(400, 'only recurring transactions have occurrences');
+    }
+    await db.query(
+      `INSERT INTO recurrence_exception (transaction_id, occurrence_date)
+       VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [id, occurrence_date]
+    );
+    res.status(201).json({ transaction_id: id, occurrence_date });
+  })
+);
+
+// Undo a handled occurrence.
+router.delete(
+  '/:id/exceptions/:date',
+  asyncHandler(async (req, res) => {
+    const id = v.id(req.params.id);
+    const date = v.date(req.params.date, 'date');
+    await db.query(
+      'DELETE FROM recurrence_exception WHERE transaction_id = $1 AND occurrence_date = $2',
+      [id, date]
+    );
+    res.status(204).end();
   })
 );
 

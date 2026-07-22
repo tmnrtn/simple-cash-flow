@@ -216,9 +216,26 @@ export default function Dashboard() {
   }));
   const allWeekEnds = Object.fromEntries(balances.map((b) => [b.week_number, fmt(b.week_end)]));
 
+  // The whole forecast is anchored to the latest balance entry — warn when
+  // that anchor has gone stale, since the projection quality depends on it.
+  const staleDays = data.start_date
+    ? Math.floor((Date.now() - new Date(`${data.start_date}T00:00:00`)) / 86400000)
+    : 0;
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-gray-800">Cash Flow</h1>
+
+      {staleDays > 7 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded px-4 py-2 text-sm">
+          This forecast is anchored to your last balance from <b>{data.start_date}</b> ({staleDays}{' '}
+          days ago).{' '}
+          <Link to="/balance" className="underline font-medium">
+            Update your balance
+          </Link>{' '}
+          to keep it accurate.
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="font-semibold text-gray-700 mb-4">End Balance by Week</h2>
