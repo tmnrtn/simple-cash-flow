@@ -73,7 +73,7 @@ test('categories: starter categories are seeded and new ones can be created', as
 
 test('dashboard is empty when there is no balance', async () => {
   const data = await get('/api/dashboard');
-  assert.deepStrictEqual(data, { balances: [], receipts: [], payments: [] });
+  assert.deepStrictEqual(data, { start_date: null, balances: [], receipts: [], payments: [] });
 });
 
 test('dashboard projects the 13-week forecast with recurrence and paid rules', async () => {
@@ -86,9 +86,10 @@ test('dashboard projects the 13-week forecast with recurrence and paid rules', a
       (FALSE, 'MonthlyRent',  100, '2026-01-05', NULL, FALSE, 'monthly')  -- recurs across the window
   `);
 
-  const { balances, receipts, payments } = await get('/api/dashboard');
+  const { start_date, balances, receipts, payments } = await get('/api/dashboard');
 
-  // 13 weeks projected.
+  // Anchored to the latest balance entry; 13 weeks projected.
+  assert.strictEqual(start_date, '2026-01-05');
   assert.strictEqual(balances.length, 13);
 
   // Week 1: +500 income, -100 rent => net 400; running balance 1000 -> 1400.
@@ -166,7 +167,7 @@ test('unknown routes return a 404 JSON error', async () => {
 
 test('weekly recurrence expands each week and stops at recurrence_end', async () => {
   // Self-contained: reset the projection data. Runs last so nothing depends on it.
-  await db.query('TRUNCATE transaction, balance RESTART IDENTITY');
+  await db.query('TRUNCATE transaction, balance, recurrence_exception RESTART IDENTITY');
   await db.query("INSERT INTO balance (balance_date, balance_amount) VALUES ('2026-01-05', 0)");
   await db.query(`
     INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence, recurrence_end)
@@ -181,7 +182,7 @@ test('weekly recurrence expands each week and stops at recurrence_end', async ()
 });
 
 test('annual recurrence appears once within the 13-week window', async () => {
-  await db.query('TRUNCATE transaction, balance RESTART IDENTITY');
+  await db.query('TRUNCATE transaction, balance, recurrence_exception RESTART IDENTITY');
   await db.query("INSERT INTO balance (balance_date, balance_amount) VALUES ('2026-01-05', 0)");
   await db.query(`
     INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence)
@@ -195,7 +196,7 @@ test('annual recurrence appears once within the 13-week window', async () => {
 });
 
 test('transactions list reports next_due_date (next occurrence for recurring)', async () => {
-  await db.query('TRUNCATE transaction, balance RESTART IDENTITY');
+  await db.query('TRUNCATE transaction, balance, recurrence_exception RESTART IDENTITY');
   // Monthly recurring anchored far in the past on the 15th.
   await db.query(`
     INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence)
@@ -223,4 +224,75 @@ test('transactions list reports next_due_date (next occurrence for recurring)', 
     rows.findIndex((r) => r.counterparty === 'OneOff') <
       rows.findIndex((r) => r.counterparty === 'MonthlyPast')
   );
+});
+
+test('marking an occurrence handled advances next_due_date and undo restores it', async () => {
+  await db.query('TRUNCATE transaction, balance, recurrence_exception RESTART IDENTITY');
+  await db.query(`
+    INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence)
+    VALUES (FALSE, 'Rent', 100, '2020-01-01', FALSE, 'monthly')
+  `);
+
+  const [before] = await get('/api/transactions');
+  const firstNext = before.next_due_date;
+  assert.strictEqual(before.exception_count, 0);
+
+  // Mark the next occurrence handled.
+  const res = await postJson(`/api/transactions/${before.id}/exceptions`, {
+    occurrence_date: firstNext,
+  });
+  assert.strictEqual(res.status, 201);
+
+  const [after] = await get('/api/transactions');
+  assert.ok(after.next_due_date > firstNext, 'next_due_date should advance past the exception');
+  assert.strictEqual(after.exception_count, 1);
+  assert.strictEqual(after.last_exception_date, firstNext);
+
+  // Undo restores the original next occurrence.
+  const del = await fetch(`${baseURL}/api/transactions/${before.id}/exceptions/${firstNext}`, {
+    method: 'DELETE',
+  });
+  assert.strictEqual(del.status, 204);
+  const [restored] = await get('/api/transactions');
+  assert.strictEqual(restored.next_due_date, firstNext);
+});
+
+test('a handled occurrence is excluded from the dashboard projection', async () => {
+  await db.query('TRUNCATE transaction, balance, recurrence_exception RESTART IDENTITY');
+  await db.query("INSERT INTO balance (balance_date, balance_amount) VALUES ('2026-01-05', 0)");
+  await db.query(`
+    INSERT INTO transaction (id, is_income, counterparty, amount, due_date, paid, recurrence)
+    VALUES (1, FALSE, 'MonthlyRent', 100, '2026-01-05', FALSE, 'monthly')
+  `);
+
+  const beforeTotal = (await get('/api/dashboard')).payments.reduce(
+    (s, p) => s + Number(p.amount),
+    0
+  );
+
+  await db.query(
+    "INSERT INTO recurrence_exception (transaction_id, occurrence_date) VALUES (1, '2026-02-05')"
+  );
+
+  const { payments } = await get('/api/dashboard');
+  const afterTotal = payments.reduce((s, p) => s + Number(p.amount), 0);
+  assert.strictEqual(afterTotal, beforeTotal - 100, 'one occurrence should leave the projection');
+});
+
+test('exceptions are rejected for non-recurring or missing transactions', async () => {
+  await db.query('TRUNCATE transaction, balance, recurrence_exception RESTART IDENTITY');
+  await db.query(`
+    INSERT INTO transaction (id, is_income, counterparty, amount, due_date, paid)
+    VALUES (1, TRUE, 'OneOff', 50, '2026-01-01', FALSE)
+  `);
+
+  const nonRecurring = await postJson('/api/transactions/1/exceptions', {
+    occurrence_date: '2026-01-01',
+  });
+  assert.strictEqual(nonRecurring.status, 400);
+
+  const missing = await postJson('/api/transactions/999/exceptions', {
+    occurrence_date: '2026-01-01',
+  });
+  assert.strictEqual(missing.status, 404);
 });
