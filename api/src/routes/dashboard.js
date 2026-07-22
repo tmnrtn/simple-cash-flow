@@ -31,6 +31,14 @@ const entriesCte = `
 `;
 
 router.get('/', async (req, res) => {
+  // The projection is anchored to the most recent balance snapshot. With no
+  // balance on record there is nothing to project from, so return empty
+  // results and let the UI show an onboarding hint instead of a broken chart.
+  const { rows: balanceRows } = await db.query('SELECT 1 FROM balance LIMIT 1');
+  if (!balanceRows.length) {
+    return res.json({ balances: [], receipts: [], payments: [] });
+  }
+
   const balancesQuery = `
     WITH ${entriesCte},
     weeks AS (SELECT generate_series(1, 13) AS wk),

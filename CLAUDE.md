@@ -19,6 +19,8 @@ docker compose up --build
 
 Override ports with `API_PORT` and `WEB_PORT` env vars.
 
+**Configuration** lives in a `.env` file (gitignored) that `docker compose` reads automatically; `.env.example` documents every variable. Authentication is **on by default** — a fresh `docker compose up` will refuse to start the API until `AUTH_PASSWORD` and `AUTH_SECRET` are set, or `AUTH_DISABLED=true` is given for trusted-LAN use. Set `DEMO_DATA=true` to seed a fictional demo dataset on the database's first boot.
+
 ## Local development (without Docker)
 
 ```bash
@@ -40,8 +42,8 @@ docker compose up db
 
 Three services in `docker-compose.yml`:
 
-- **`db`** — Postgres 16. Schema and seed data initialised from `db/init.sql` on first run (via `docker-entrypoint-initdb.d`). Persistent volume `postgres_data`.
-- **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`.
+- **`db`** — Postgres 16. Schema and generic starter categories initialised from `db/init.sql` on first run (via `docker-entrypoint-initdb.d`); a fresh install has no balance/projects/transactions. `db/demo-seed.sh` optionally seeds a fictional demo dataset (relative dates) when `DEMO_DATA=true`. Persistent volume `postgres_data` — note init scripts only run when this volume is empty. Mounted as `01-init.sql` / `02-demo-seed.sh` so ordering is deterministic.
+- **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`. Auth lives in `api/src/auth.js`.
 - **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes.
 
 ## Key design details
@@ -55,6 +57,10 @@ Three services in `docker-compose.yml`:
 **Database schema** (`db/init.sql`): four tables — `category`, `project`, `balance`, and `transaction`. `transaction` is the central table with `is_income BOOLEAN` (TRUE = invoice/income, FALSE = bill/expense), `counterparty`, `category` FK (expenses only), `project_id` FK, `paid BOOLEAN`, and `recurrence TEXT` (NULL or `'monthly'`). `balance` holds point-in-time snapshots; the latest entry is used as the projection start date.
 
 **Recurrence behaviour**: recurring transactions (`recurrence = 'monthly'`) are always projected forward regardless of `paid` status — the paid toggle is hidden for them in the UI. Non-recurring paid transactions are excluded from the dashboard projection.
+
+**Authentication** (`api/src/auth.js`): single-user login. The API mounts `/api/auth/*` (login/logout/me) publicly, then applies `authMiddleware` to protect all other `/api/*` routes. A successful login sets a signed, httpOnly `session` cookie (HMAC-SHA256 over the payload using `AUTH_SECRET`, via Node's built-in `crypto` — no JWT library). Credentials come from env: `AUTH_PASSWORD` (plaintext) or `AUTH_PASSWORD_HASH` (bcrypt, takes precedence). `assertAuthConfig()` runs at startup and exits the process if auth is enabled but unconfigured. `AUTH_DISABLED=true` bypasses everything for trusted LANs. Login is rate-limited in-memory per IP. On the frontend, `App.jsx` gates the whole SPA on `GET /api/auth/me` and shows `pages/Login.jsx` when unauthenticated; `web/src/api.js` dispatches an `auth:unauthorized` window event on any 401 so an expired session drops back to the login screen.
+
+**Empty state**: with no `balance` row the dashboard query returns empty arrays (guarded in `dashboard.js`) and the UI shows an onboarding prompt instead of a broken chart.
 
 ## Legacy reference files
 
