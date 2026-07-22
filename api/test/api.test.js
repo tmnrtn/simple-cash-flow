@@ -136,7 +136,7 @@ test('validation: invalid recurrence returns 400', async () => {
     is_income: false,
     amount: 10,
     due_date: '2026-02-01',
-    recurrence: 'weekly',
+    recurrence: 'daily',
   });
   assert.strictEqual(res.status, 400);
   assert.match((await res.json()).error, /recurrence/i);
@@ -162,4 +162,34 @@ test('unknown routes return a 404 JSON error', async () => {
   const res = await fetch(`${baseURL}/api/nope`);
   assert.strictEqual(res.status, 404);
   assert.deepStrictEqual(await res.json(), { error: 'Not found' });
+});
+
+test('weekly recurrence expands each week and stops at recurrence_end', async () => {
+  // Self-contained: reset the projection data. Runs last so nothing depends on it.
+  await db.query('TRUNCATE transaction, balance RESTART IDENTITY');
+  await db.query("INSERT INTO balance (balance_date, balance_amount) VALUES ('2026-01-05', 0)");
+  await db.query(`
+    INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence, recurrence_end)
+    VALUES (TRUE, 'WeeklyGig', 100, '2026-01-05', FALSE, 'weekly', '2026-01-26')
+  `);
+
+  const { receipts } = await get('/api/dashboard');
+  const weeks = new Set(receipts.map((r) => r.week_number));
+  // Occurrences: Jan 5, 12, 19, 26 — four weeks, then it stops (end date reached).
+  assert.strictEqual(weeks.size, 4);
+  assert.ok(receipts.every((r) => Number(r.amount) === 100));
+});
+
+test('annual recurrence appears once within the 13-week window', async () => {
+  await db.query('TRUNCATE transaction, balance RESTART IDENTITY');
+  await db.query("INSERT INTO balance (balance_date, balance_amount) VALUES ('2026-01-05', 0)");
+  await db.query(`
+    INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence)
+    VALUES (FALSE, 'AnnualInsurance', 500, '2026-01-05', FALSE, 'annually')
+  `);
+
+  const { payments } = await get('/api/dashboard');
+  // Next occurrence is a year out, far beyond the window — only Jan 5 shows.
+  assert.strictEqual(payments.length, 1);
+  assert.strictEqual(Number(payments[0].amount), 500);
 });

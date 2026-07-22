@@ -11,7 +11,16 @@ const empty = {
   category: '',
   project_id: '',
   recurrence: '',
+  recurrence_end: '',
 };
+
+const RECURRENCE_OPTIONS = [
+  ['', 'None (one-off)'],
+  ['weekly', 'Weekly'],
+  ['monthly', 'Monthly'],
+  ['quarterly', 'Quarterly'],
+  ['annually', 'Annually'],
+];
 
 function fmt(date) {
   return date ? date.slice(0, 10) : '';
@@ -55,6 +64,7 @@ export default function Transactions() {
       category: row.category || '',
       project_id: row.project_id || '',
       recurrence: row.recurrence || '',
+      recurrence_end: fmt(row.recurrence_end),
     });
     setError('');
     setModal({ mode: 'edit', id: row.id });
@@ -202,9 +212,9 @@ export default function Transactions() {
                   </td>
                   <td className="px-4 py-3 text-gray-500">{row.project_name || ''}</td>
                   <td className="px-4 py-3">
-                    {row.recurrence === 'monthly' ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
-                        Monthly
+                    {row.recurrence ? (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 capitalize">
+                        {row.recurrence}
                       </span>
                     ) : null}
                   </td>
@@ -303,13 +313,36 @@ export default function Transactions() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Recurrence</label>
               <select
                 value={form.recurrence}
-                onChange={(e) => set('recurrence', e.target.value)}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    recurrence: e.target.value,
+                    // Drop a stale end date when reverting to one-off.
+                    recurrence_end: e.target.value ? f.recurrence_end : '',
+                  }))
+                }
                 className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">None (one-off)</option>
-                <option value="monthly">Monthly</option>
+                {RECURRENCE_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
+            {form.recurrence && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Recurrence end <span className="text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="date"
+                  value={form.recurrence_end}
+                  onChange={(e) => set('recurrence_end', e.target.value)}
+                  className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button
