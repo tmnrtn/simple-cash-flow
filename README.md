@@ -62,6 +62,8 @@ Compose. See [`.env.example`](.env.example) for the annotated list.
 | `AUTH_USERNAME` | `admin` | no | Login username. |
 | `AUTH_DISABLED` | `false` | no | Set `true` to disable auth entirely (trusted LAN only). |
 | `DEMO_DATA` | `false` | no | Seed a fictional demo dataset into a fresh (empty) database. |
+| `CURRENCY` | `GBP` | no | ISO 4217 currency code for amounts shown in the UI (e.g. `USD`, `EUR`). |
+| `LOCALE` | browser | no | BCP 47 locale for number formatting (e.g. `en-US`). Blank uses the viewer's browser locale. |
 | `WEB_PORT` | `8080` | no | Host port for the web app. |
 | `API_PORT` | `3000` | no | Host port for the API — development only (see below). |
 | `IMAGE_TAG` | `latest` | no | Published image tag to run (`latest`, a version like `1.2.3`, or `edge`). |
@@ -117,6 +119,31 @@ docker compose exec -T db psql -U postgres cashflow < backup.sql
 ```
 
 Adjust the user/database if you changed `POSTGRES_USER` / `POSTGRES_DB`.
+
+## CSV import & export
+
+The **Transactions** page has **Export CSV** and **Import CSV** buttons (the
+**Balance** page can export too). Import parses the file, lets you adjust the
+column mapping, and shows a per-row validation preview before importing the
+valid rows. An export re-imports cleanly.
+
+Transaction CSV columns (a header row is required; order doesn't matter, and
+extra columns are ignored):
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| `type` | yes | `income` or `expense`. |
+| `amount` | yes | Positive number. |
+| `due_date` | yes | `YYYY-MM-DD`. |
+| `counterparty` | no | Free text. |
+| `description` | no | Free text. |
+| `category` | no | Must match an existing category **name**. |
+| `project` | no | Must match an existing project **name**. |
+| `recurrence` | no | `weekly`, `monthly`, `quarterly`, or `annually`. |
+| `recurrence_end` | no | `YYYY-MM-DD`; requires `recurrence`. |
+
+Rows that fail validation are listed with the reason and skipped; the rest are
+imported.
 
 ## Development
 

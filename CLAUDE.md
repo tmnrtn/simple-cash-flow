@@ -48,7 +48,7 @@ Three services in `docker-compose.yml`:
 
 - **`db`** — Postgres 16, empty by default. Schema is **not** created by initdb scripts; the API applies migrations on startup (see below). Persistent volume `postgres_data`. Not published to the host.
 - **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`. Auth lives in `api/src/auth.js`. On startup it runs `migrate()` (`api/src/migrate.js`) then `maybeSeedDemo()` (`api/src/seed.js`) before listening.
-- **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes. Built by a multi-stage `web/Dockerfile` (`build` → nginx `production`; a `dev` stage runs the Vite server for the dev override). All three services have healthchecks; `api` exposes an unauthenticated `GET /api/health` for its probe.
+- **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes. Currency/locale formatting lives in `web/src/format.js`, configured once at startup from the public `GET /api/config` endpoint (`CURRENCY`/`LOCALE` env; blank locale uses the browser's). Built by a multi-stage `web/Dockerfile` (`build` → nginx `production`; a `dev` stage runs the Vite server for the dev override). All three services have healthchecks; `api` exposes an unauthenticated `GET /api/health` for its probe.
 
 ## Key design details
 

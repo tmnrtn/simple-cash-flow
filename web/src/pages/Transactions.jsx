@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import Modal from '../components/Modal';
+import ImportModal from '../components/ImportModal';
+import { formatCurrency } from '../format';
+import { downloadCsv } from '../csv';
+import { transactionsToCsv } from '../transactionsCsv';
 
 const empty = {
   is_income: true,
@@ -41,6 +45,7 @@ export default function Transactions() {
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(empty);
   const [error, setError] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const load = () => api.get('/api/transactions').then(setRows);
   useEffect(() => {
@@ -140,6 +145,19 @@ export default function Transactions() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => downloadCsv('transactions.csv', transactionsToCsv(rows, fmt))}
+            disabled={rows.length === 0}
+            className="px-3 py-1.5 border text-gray-700 text-sm rounded hover:bg-gray-50 disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => setImporting(true)}
+            className="px-3 py-1.5 border text-gray-700 text-sm rounded hover:bg-gray-50"
+          >
+            Import CSV
+          </button>
+          <button
             onClick={() => openAdd(true)}
             className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700"
           >
@@ -153,6 +171,15 @@ export default function Transactions() {
           </button>
         </div>
       </div>
+
+      {importing && (
+        <ImportModal
+          categories={categories}
+          projects={projects}
+          onClose={() => setImporting(false)}
+          onImported={load}
+        />
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full text-sm">
@@ -195,8 +222,8 @@ export default function Transactions() {
                   <td
                     className={`px-4 py-3 text-right ${paid ? 'line-through text-gray-400' : row.is_income ? 'text-green-700' : 'text-red-700'}`}
                   >
-                    {row.is_income ? '+' : '-'}£
-                    {Number(row.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                    {row.is_income ? '+' : '-'}
+                    {formatCurrency(row.amount)}
                   </td>
                   <td className={`px-4 py-3 ${paid ? 'text-gray-400' : ''}`}>
                     {fmt(row.due_date)}
