@@ -1,22 +1,24 @@
-# Development override: run the Vite dev server (hot reload) instead of the
-# production nginx build, mount source for live editing, and expose the API on
-# the host for direct access.
+# Development override: build from source and run the Vite dev server (hot
+# reload) instead of the published production image, mount source for live
+# editing, and expose the API on the host for direct access.
 #
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Usage (note --build, since the base file references pulled images):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
 # The web dev server still listens on 8080, so it stays reachable at
 # http://localhost:${WEB_PORT:-8080} just like production.
 services:
   api:
-    command: ["node", "--watch", "src/index.js"]
+    build: ./api
+    command: ['node', '--watch', 'src/index.js']
     ports:
-      - "${API_PORT:-3000}:3000"
+      - '${API_PORT:-3000}:3000'
     volumes:
       - ./api/src:/app/src
 
   web:
     build:
+      context: ./web
       target: dev
     environment:
       # Vite proxies /api to the api service (see web/vite.config.js).

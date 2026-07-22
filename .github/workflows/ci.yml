@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v7
       # compose interpolates the file before building; POSTGRES_PASSWORD is a
       # required variable, so provide a throwaway value for the build.
-      - name: Build all images
-        run: docker compose build
+      - name: Build all images from source
+        run: docker compose -f docker-compose.yml -f docker-compose.build.yml build
         env:
           POSTGRES_PASSWORD: ci

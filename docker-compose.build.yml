@@ -1,0 +1,15 @@
+# Build-from-source override. Layer on top of docker-compose.yml to build the
+# api and web images locally instead of pulling them from GHCR. The `image:`
+# names are inherited from the base file, so the built images are tagged to
+# match.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+services:
+  api:
+    build: ./api
+
+  web:
+    build:
+      context: ./web
+      target: production

@@ -1,3 +1,11 @@
+# End-user stack: pulls the published images from GHCR and runs them.
+#   cp .env.example .env  &&  docker compose up -d
+# Override IMAGE_TAG in .env to pin a version (default: latest).
+#
+# To build from source instead, layer the build override:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+# For a hot-reload dev environment:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 services:
   db:
     image: postgres:16-alpine
@@ -21,7 +29,7 @@ services:
       retries: 10
 
   api:
-    build: ./api
+    image: ghcr.io/tmnrtn/simple-cash-flow-api:${IMAGE_TAG:-latest}
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -50,9 +58,7 @@ services:
         condition: service_healthy
 
   web:
-    build:
-      context: ./web
-      target: production
+    image: ghcr.io/tmnrtn/simple-cash-flow-web:${IMAGE_TAG:-latest}
     ports:
       - "${WEB_PORT:-8080}:8080"
     healthcheck:
