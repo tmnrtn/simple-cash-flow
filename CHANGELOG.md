@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/tmnrtn/simple-cash-flow/compare/v1.2.0...v1.3.0) (2026-07-22)
+
+
+### Features
+
+* mark individual occurrences of recurring transactions as handled ([2ed208c](https://github.com/tmnrtn/simple-cash-flow/commit/2ed208c41e99cef9be09f8212792937f920e0ff8))
+* warn when the forecast's balance anchor is stale ([511f689](https://github.com/tmnrtn/simple-cash-flow/commit/511f6893bc2b9c51f28561b6106a9abfecfdfa62))
+
+
+### Bug Fixes
+
+* store money as exact NUMERIC(12,2) instead of REAL ([d358ccb](https://github.com/tmnrtn/simple-cash-flow/commit/d358ccb663d5f325bfeef870a330da4e913d5b52))
+
 ## [1.2.0](https://github.com/tmnrtn/simple-cash-flow/compare/v1.1.0...v1.2.0) (2026-07-22)
 
 
