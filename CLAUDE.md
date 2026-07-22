@@ -72,4 +72,14 @@ Three services in `docker-compose.yml`:
 
 ## Testing and linting
 
-There is no test suite or linter configured — no test/lint scripts exist in either `package.json`. Verify changes by running the app (`docker compose up --build`) and exercising it manually.
+Both packages have `lint` (ESLint flat config), `format` / `format:check` (Prettier, shared `.prettierrc.json`), and `test` scripts. Run them per package:
+
+```bash
+cd api && npm run lint && npm run format:check && npm test
+cd web && npm run lint && npm run format:check && npm test
+```
+
+- **API tests** (`api/test/`, Node's built-in `node --test`): `auth.test.js` unit-tests `auth.js` with no DB; `api.test.js` is an integration test that spins up a real Postgres via **testcontainers** (needs a Docker daemon), applies `db/init.sql`, and exercises CRUD plus the dashboard projection (recurrence expansion, paid exclusion, running balance, empty state). `api/src/index.js` exports the Express `app` and only calls `listen()` when run directly, so tests can import it.
+- **Web tests** (`*.test.jsx`, **Vitest** + Testing Library, jsdom via `vitest.config.js` + `src/test/setup.js`): cover the login form and the dashboard empty/populated states. The api client is mocked with `vi.mock`.
+
+Still verify end-to-end changes by running the app (`docker compose up --build`).
