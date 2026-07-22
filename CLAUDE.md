@@ -41,7 +41,7 @@ docker compose up db
 Three services in `docker-compose.yml`:
 
 - **`db`** — Postgres 16. Schema and seed data initialised from `db/init.sql` on first run (via `docker-entrypoint-initdb.d`). Persistent volume `postgres_data`.
-- **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `bills`, `categories`, `invoices`, `dashboard`.
+- **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`.
 - **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes.
 
 ## Key design details
@@ -52,6 +52,14 @@ Three services in `docker-compose.yml`:
 
 **API proxy** — Vite proxies `/api/*` to the API service, so the web app makes relative `/api/` calls. No base URL configuration needed in the frontend.
 
-**Database schema** (`db/init.sql`): five tables — `category`, `project`, `balance`, and `transaction`. `transaction` is the central table with `is_income BOOLEAN` (TRUE = invoice/income, FALSE = bill/expense), `counterparty`, `category` FK (expenses only), `project_id` FK, `paid BOOLEAN`, and `recurrence TEXT` (NULL or `'monthly'`). `balance` holds point-in-time snapshots; the latest entry is used as the projection start date.
+**Database schema** (`db/init.sql`): four tables — `category`, `project`, `balance`, and `transaction`. `transaction` is the central table with `is_income BOOLEAN` (TRUE = invoice/income, FALSE = bill/expense), `counterparty`, `category` FK (expenses only), `project_id` FK, `paid BOOLEAN`, and `recurrence TEXT` (NULL or `'monthly'`). `balance` holds point-in-time snapshots; the latest entry is used as the projection start date.
 
 **Recurrence behaviour**: recurring transactions (`recurrence = 'monthly'`) are always projected forward regardless of `paid` status — the paid toggle is hidden for them in the UI. Non-recurring paid transactions are excluded from the dashboard projection.
+
+## Legacy reference files
+
+`schema.sql` (repo root) is the **old Supabase schema**, kept for context only — it is not runnable and does not reflect the current database (it still has separate `invoice`/`bill` tables, since consolidated into `transaction`). The live schema is `db/init.sql`. `Requirements.md` is the original migration brief describing the Supabase + Budibase + Metabase stack this app replaced.
+
+## Testing and linting
+
+There is no test suite or linter configured — no test/lint scripts exist in either `package.json`. Verify changes by running the app (`docker compose up --build`) and exercising it manually.
