@@ -107,3 +107,59 @@ test('dashboard projects the 13-week forecast with recurrence and paid rules', a
   assert.ok(rentWeeks.size >= 3, `expected recurring rent across >=3 weeks, got ${rentWeeks.size}`);
   assert.ok(payments.every((p) => Number(p.amount) === 100));
 });
+
+const postJson = (path, body) =>
+  fetch(`${baseURL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+test('validation: missing required field returns 400 with a message', async () => {
+  const res = await postJson('/api/categories', {});
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /name is required/i);
+});
+
+test('validation: non-numeric amount returns 400', async () => {
+  const res = await postJson('/api/transactions', {
+    is_income: true,
+    amount: 'lots',
+    due_date: '2026-02-01',
+  });
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /amount must be a number/i);
+});
+
+test('validation: invalid recurrence returns 400', async () => {
+  const res = await postJson('/api/transactions', {
+    is_income: false,
+    amount: 10,
+    due_date: '2026-02-01',
+    recurrence: 'weekly',
+  });
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /recurrence/i);
+});
+
+test('a missing foreign key maps to 400 (and does not hang the request)', async () => {
+  const res = await postJson('/api/transactions', {
+    is_income: false,
+    amount: 10,
+    due_date: '2026-02-01',
+    category: 99999,
+  });
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /category/i);
+});
+
+test('a non-integer id returns 400', async () => {
+  const res = await fetch(`${baseURL}/api/categories/abc`, { method: 'DELETE' });
+  assert.strictEqual(res.status, 400);
+});
+
+test('unknown routes return a 404 JSON error', async () => {
+  const res = await fetch(`${baseURL}/api/nope`);
+  assert.strictEqual(res.status, 404);
+  assert.deepStrictEqual(await res.json(), { error: 'Not found' });
+});

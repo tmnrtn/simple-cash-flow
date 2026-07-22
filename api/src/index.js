@@ -3,6 +3,7 @@ const cors = require('cors');
 const db = require('./db');
 const { migrate } = require('./migrate');
 const { maybeSeedDemo } = require('./seed');
+const { notFoundHandler, errorHandler } = require('./http');
 const { router: authRouter, authMiddleware, assertAuthConfig } = require('./auth');
 
 assertAuthConfig();
@@ -27,6 +28,10 @@ app.use('/api/projects', require('./routes/projects'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/balance', require('./routes/balance'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+
+// Unmatched routes → 404, then centralised error handling (must be last).
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Run pending migrations (and optional demo seed) before serving traffic.
 async function start() {
