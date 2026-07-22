@@ -226,7 +226,7 @@ export default function Transactions() {
                     {formatCurrency(row.amount)}
                   </td>
                   <td className={`px-4 py-3 ${paid ? 'text-gray-400' : ''}`}>
-                    {fmt(row.due_date)}
+                    {fmt(row.next_due_date || row.due_date)}
                   </td>
                   <td className="px-4 py-3">
                     {row.category_name ? (

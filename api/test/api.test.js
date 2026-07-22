@@ -193,3 +193,34 @@ test('annual recurrence appears once within the 13-week window', async () => {
   assert.strictEqual(payments.length, 1);
   assert.strictEqual(Number(payments[0].amount), 500);
 });
+
+test('transactions list reports next_due_date (next occurrence for recurring)', async () => {
+  await db.query('TRUNCATE transaction, balance RESTART IDENTITY');
+  // Monthly recurring anchored far in the past on the 15th.
+  await db.query(`
+    INSERT INTO transaction (is_income, counterparty, amount, due_date, paid, recurrence)
+    VALUES (FALSE, 'MonthlyPast', 100, '2020-03-15', FALSE, 'monthly')
+  `);
+  // A one-off keeps its original date.
+  await db.query(`
+    INSERT INTO transaction (is_income, counterparty, amount, due_date, paid)
+    VALUES (TRUE, 'OneOff', 50, '2020-01-01', FALSE)
+  `);
+
+  const rows = await get('/api/transactions');
+  const today = new Date().toISOString().slice(0, 10);
+
+  const recurring = rows.find((r) => r.counterparty === 'MonthlyPast');
+  const next = recurring.next_due_date.slice(0, 10);
+  assert.ok(next >= today, `next_due_date ${next} should be on/after today ${today}`);
+  assert.strictEqual(next.slice(8, 10), '15'); // monthly preserves the day-of-month
+
+  const oneoff = rows.find((r) => r.counterparty === 'OneOff');
+  assert.strictEqual(oneoff.next_due_date.slice(0, 10), '2020-01-01');
+
+  // Ordered by next_due_date: the past-dated one-off sorts before the recurring.
+  assert.ok(
+    rows.findIndex((r) => r.counterparty === 'OneOff') <
+      rows.findIndex((r) => r.counterparty === 'MonthlyPast')
+  );
+});

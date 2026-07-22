@@ -27,12 +27,36 @@ function parseTransaction(body) {
 router.get(
   '/',
   asyncHandler(async (req, res) => {
+    // next_due_date is the next occurrence on/after today for recurring rows
+    // (stepping by the recurrence interval from due_date, respecting
+    // recurrence_end), and just due_date for one-offs. The list orders by it so
+    // recurring items sort by when they are next due, not their original date.
     const { rows } = await db.query(`
-      SELECT t.*, c.name AS category_name, p.name AS project_name
+      SELECT t.*, c.name AS category_name, p.name AS project_name,
+        -- to_char keeps this a plain YYYY-MM-DD string, immune to the timezone
+        -- shift the pg driver applies when parsing date columns into JS Dates.
+        to_char(COALESCE(nd.next_due, t.due_date), 'YYYY-MM-DD') AS next_due_date
       FROM transaction t
       LEFT JOIN category c ON t.category = c.id
       LEFT JOIN project p ON t.project_id = p.id
-      ORDER BY t.due_date
+      LEFT JOIN LATERAL (
+        SELECT MIN(gs)::date AS next_due
+        FROM generate_series(
+          t.due_date,
+          (CURRENT_DATE + INTERVAL '400 days')::date,
+          CASE t.recurrence
+            WHEN 'weekly' THEN INTERVAL '1 week'
+            WHEN 'monthly' THEN INTERVAL '1 month'
+            WHEN 'quarterly' THEN INTERVAL '3 months'
+            WHEN 'annually' THEN INTERVAL '1 year'
+            ELSE INTERVAL '1000 years'
+          END
+        ) AS gs
+        WHERE t.recurrence IS NOT NULL
+          AND gs >= CURRENT_DATE
+          AND (t.recurrence_end IS NULL OR gs <= t.recurrence_end)
+      ) nd ON true
+      ORDER BY COALESCE(nd.next_due, t.due_date), t.id
     `);
     res.json(rows);
   })
