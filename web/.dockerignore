@@ -3,3 +3,6 @@ dist
 .env
 *.local
 npm-debug.log*
+# Excluded so the Alpine image resolves rollup's musl-native binary at build
+# time (npm/cli#4828). CI still installs from the lockfile via `npm ci`.
+package-lock.json
