@@ -36,6 +36,10 @@ jobs:
   publish:
     needs: release-please
     runs-on: ubuntu-latest
+    # Historical builds finish in ≤5 min; a poisoned gha build cache once hung
+    # this job indefinitely (2026-07-22). Fail fast instead — the fix was
+    # purging the repo's buildkit cache entries and re-running.
+    timeout-minutes: 15
     strategy:
       matrix:
         include:
