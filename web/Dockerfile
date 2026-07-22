@@ -2,6 +2,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
+# npm install (not ci) so the Alpine/musl-native rollup binary resolves
+# correctly regardless of the platform the lockfile was generated on.
 RUN npm install
 COPY . .
 RUN npm run build
