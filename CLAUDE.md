@@ -20,7 +20,7 @@ docker compose up --build
 
 **Production serving**: the `web` container builds the SPA to static files and serves them via non-root nginx (`web/nginx.conf`), reverse-proxying `/api` to the `api` container. Only the web port is published to the host — the API and DB are reachable only on the internal Docker network. `WEB_PORT` sets the host port; `API_PORT` only matters in dev (below).
 
-**Configuration** lives in a `.env` file (gitignored) that `docker compose` reads automatically; `.env.example` and the README table document every variable. Required secrets have no defaults and fail fast: `docker compose` won't start without `POSTGRES_PASSWORD`, and the API exits at startup if `DB_PASSWORD` is missing or (with auth enabled) `AUTH_PASSWORD`/`AUTH_SECRET` are unset. Auth is **on by default**; use `AUTH_DISABLED=true` for trusted-LAN use. Set `DEMO_DATA=true` to seed a fictional demo dataset on the database's first boot.
+**Configuration** lives in a `.env` file (gitignored) that `docker compose` reads automatically; `.env.example` and the README table document every variable. Required secrets have no defaults and fail fast: `docker compose` won't start without `POSTGRES_PASSWORD`, and the API exits at startup if `DB_PASSWORD` is missing or (with auth enabled) `AUTH_PASSWORD`/`AUTH_SECRET` are unset. Auth is **on by default**; use `AUTH_DISABLED=true` for trusted-LAN use. Set `DEMO_DATA=true` to seed a fictional demo dataset into a fresh (empty) database.
 
 ## Local development
 
@@ -46,8 +46,8 @@ For option 2 the web dev server proxies `/api` to `API_TARGET` (default `http://
 
 Three services in `docker-compose.yml`:
 
-- **`db`** — Postgres 16. Schema and generic starter categories initialised from `db/init.sql` on first run (via `docker-entrypoint-initdb.d`); a fresh install has no balance/projects/transactions. `db/demo-seed.sh` optionally seeds a fictional demo dataset (relative dates) when `DEMO_DATA=true`. Persistent volume `postgres_data` — note init scripts only run when this volume is empty. Mounted as `01-init.sql` / `02-demo-seed.sh` so ordering is deterministic.
-- **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`. Auth lives in `api/src/auth.js`.
+- **`db`** — Postgres 16, empty by default. Schema is **not** created by initdb scripts; the API applies migrations on startup (see below). Persistent volume `postgres_data`. Not published to the host.
+- **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`. Auth lives in `api/src/auth.js`. On startup it runs `migrate()` (`api/src/migrate.js`) then `maybeSeedDemo()` (`api/src/seed.js`) before listening.
 - **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes. Built by a multi-stage `web/Dockerfile` (`build` → nginx `production`; a `dev` stage runs the Vite server for the dev override). All three services have healthchecks; `api` exposes an unauthenticated `GET /api/health` for its probe.
 
 ## Key design details
@@ -58,7 +58,7 @@ Three services in `docker-compose.yml`:
 
 **API proxy** — Vite proxies `/api/*` to the API service, so the web app makes relative `/api/` calls. No base URL configuration needed in the frontend.
 
-**Database schema** (`db/init.sql`): four tables — `category`, `project`, `balance`, and `transaction`. `transaction` is the central table with `is_income BOOLEAN` (TRUE = invoice/income, FALSE = bill/expense), `counterparty`, `category` FK (expenses only), `project_id` FK, `paid BOOLEAN`, and `recurrence TEXT` (NULL or `'monthly'`). `balance` holds point-in-time snapshots; the latest entry is used as the projection start date.
+**Database schema & migrations**: the schema is defined by ordered SQL files in `api/migrations/` (currently `0001_initial_schema.sql`), applied on API startup by `api/src/migrate.js` — a minimal raw-SQL runner (no dependency) that records applied files in a `schema_migrations` table, wraps each in a transaction, and serializes concurrent starts with a Postgres advisory lock. To add a schema change, drop a new `NNNN_name.sql` file in `api/migrations/`. **Backward compatibility**: if it finds an existing `transaction` table but no `schema_migrations` rows (a database created by the pre-migrations `init.sql`), it baselines `0001` as applied rather than re-running it. Demo data (`api/demo-seed.sql`) is seeded by `maybeSeedDemo()` only when `DEMO_DATA=true` and `balance` is empty. There are four tables — `category`, `project`, `balance`, and `transaction`. `transaction` is the central table with `is_income BOOLEAN` (TRUE = invoice/income, FALSE = bill/expense), `counterparty`, `category` FK (expenses only), `project_id` FK, `paid BOOLEAN`, and `recurrence TEXT` (NULL or `'monthly'`). `balance` holds point-in-time snapshots; the latest entry is used as the projection start date.
 
 **Recurrence behaviour**: recurring transactions (`recurrence = 'monthly'`) are always projected forward regardless of `paid` status — the paid toggle is hidden for them in the UI. Non-recurring paid transactions are excluded from the dashboard projection.
 
@@ -68,7 +68,7 @@ Three services in `docker-compose.yml`:
 
 ## Legacy reference files
 
-`schema.sql` (repo root) is the **old Supabase schema**, kept for context only — it is not runnable and does not reflect the current database (it still has separate `invoice`/`bill` tables, since consolidated into `transaction`). The live schema is `db/init.sql`. `Requirements.md` is the original migration brief describing the Supabase + Budibase + Metabase stack this app replaced.
+`schema.sql` (repo root) is the **old Supabase schema**, kept for context only — it is not runnable and does not reflect the current database (it still has separate `invoice`/`bill` tables, since consolidated into `transaction`). The live schema is defined by the migrations in `api/migrations/`. `Requirements.md` is the original migration brief describing the Supabase + Budibase + Metabase stack this app replaced.
 
 ## Testing and linting
 
@@ -79,7 +79,7 @@ cd api && npm run lint && npm run format:check && npm test
 cd web && npm run lint && npm run format:check && npm test
 ```
 
-- **API tests** (`api/test/`, Node's built-in `node --test`): `auth.test.js` unit-tests `auth.js` with no DB; `api.test.js` is an integration test that spins up a real Postgres via **testcontainers** (needs a Docker daemon), applies `db/init.sql`, and exercises CRUD plus the dashboard projection (recurrence expansion, paid exclusion, running balance, empty state). `api/src/index.js` exports the Express `app` and only calls `listen()` when run directly, so tests can import it.
+- **API tests** (`api/test/`, Node's built-in `node --test`): `auth.test.js` unit-tests `auth.js` with no DB; `api.test.js` is an integration test that spins up a real Postgres via **testcontainers** (needs a Docker daemon), runs the migrations via `migrate()`, and exercises CRUD plus the dashboard projection (recurrence expansion, paid exclusion, running balance, empty state) and migration idempotency. `api/src/index.js` exports the Express `app` and only calls `listen()` when run directly, so tests can import it.
 - **Web tests** (`*.test.jsx`, **Vitest** + Testing Library, jsdom via `vitest.config.js` + `src/test/setup.js`): cover the login form and the dashboard empty/populated states. The api client is mocked with `vi.mock`.
 
 Still verify end-to-end changes by running the app (`docker compose up --build`).

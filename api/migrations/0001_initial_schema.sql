@@ -34,6 +34,3 @@ INSERT INTO category (name) VALUES
   ('Contractor'),
   ('VAT/Tax'),
   ('Payroll');
-
--- A fresh install starts with no balance, projects, or transactions.
--- Set DEMO_DATA=true to load a fictional demo dataset instead (see db/demo-seed.sh).

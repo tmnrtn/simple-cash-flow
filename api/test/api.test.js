@@ -5,8 +5,6 @@ process.env.AUTH_DISABLED = 'true';
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 const { PostgreSqlContainer } = require('@testcontainers/postgresql');
 
 let container;
@@ -23,8 +21,8 @@ before(async () => {
   process.env.DB_PASSWORD = container.getPassword();
 
   db = require('../src/db');
-  const initSql = fs.readFileSync(path.join(__dirname, '../../db/init.sql'), 'utf8');
-  await db.query(initSql);
+  const { migrate } = require('../src/migrate');
+  await migrate(db);
 
   const app = require('../src/index');
   await new Promise((resolve) => {
@@ -45,6 +43,16 @@ test('health endpoint responds', async () => {
   const res = await fetch(`${baseURL}/api/health`);
   assert.strictEqual(res.status, 200);
   assert.deepStrictEqual(await res.json(), { status: 'ok' });
+});
+
+test('migrations are recorded and re-running is a no-op', async () => {
+  const { migrate } = require('../src/migrate');
+  const first = await db.query('SELECT name FROM schema_migrations');
+  assert.ok(first.rows.some((r) => r.name === '0001_initial_schema.sql'));
+
+  await migrate(db); // idempotent — should apply nothing new and not throw
+  const second = await db.query('SELECT COUNT(*)::int AS n FROM schema_migrations');
+  assert.strictEqual(second.rows[0].n, first.rows.length);
 });
 
 test('categories: starter categories are seeded and new ones can be created', async () => {

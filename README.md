@@ -39,9 +39,9 @@ docker compose up -d
 Then open **http://localhost:8080** and sign in with the username/password from
 your `.env`.
 
-> `DEMO_DATA=true` only seeds while the database volume is empty, so set it
-> before the first start. On an empty install the dashboard prompts you to add
-> your current balance to begin forecasting.
+> `DEMO_DATA=true` seeds only into a fresh (empty) database, so set it before
+> the first start. On an empty install the dashboard prompts you to add your
+> current balance to begin forecasting.
 
 By default the images track `latest`. Pin a specific release with `IMAGE_TAG` in
 `.env` (e.g. `IMAGE_TAG=1.2.3`).
@@ -61,7 +61,7 @@ Compose. See [`.env.example`](.env.example) for the annotated list.
 | `AUTH_SECRET` | — | yes¹ | Secret used to sign session cookies (use a long random string). |
 | `AUTH_USERNAME` | `admin` | no | Login username. |
 | `AUTH_DISABLED` | `false` | no | Set `true` to disable auth entirely (trusted LAN only). |
-| `DEMO_DATA` | `false` | no | Seed a fictional demo dataset on first DB boot. |
+| `DEMO_DATA` | `false` | no | Seed a fictional demo dataset into a fresh (empty) database. |
 | `WEB_PORT` | `8080` | no | Host port for the web app. |
 | `API_PORT` | `3000` | no | Host port for the API — development only (see below). |
 | `IMAGE_TAG` | `latest` | no | Published image tag to run (`latest`, a version like `1.2.3`, or `edge`). |
@@ -99,6 +99,10 @@ docker compose up -d
 
 Pinned to a version? Bump `IMAGE_TAG` in `.env` first, then run the above. Your
 data lives in the `postgres_data` volume and is untouched by upgrades.
+
+Database schema changes are applied automatically: the API runs any pending
+migrations on startup (existing databases are adopted safely), so upgrading is
+just pull-and-up. Back up first (see below) if a release notes a migration.
 
 ## Backup and restore
 
