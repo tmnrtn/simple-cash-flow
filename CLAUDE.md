@@ -9,34 +9,38 @@ A lightweight cash flow projection app for a small business. It replaces a Supab
 ## Running the app
 
 ```bash
+# Copy and fill in config first (POSTGRES_PASSWORD, AUTH_PASSWORD, AUTH_SECRET)
+cp .env.example .env
+
 # Start everything (db, api, web)
 docker compose up --build
 
-# Ports (configurable via env vars)
-# Web: http://localhost:5173
-# API: http://localhost:3000
+# Web: http://localhost:8080  (override with WEB_PORT)
 ```
 
-Override ports with `API_PORT` and `WEB_PORT` env vars.
+**Production serving**: the `web` container builds the SPA to static files and serves them via non-root nginx (`web/nginx.conf`), reverse-proxying `/api` to the `api` container. Only the web port is published to the host — the API and DB are reachable only on the internal Docker network. `WEB_PORT` sets the host port; `API_PORT` only matters in dev (below).
 
-**Configuration** lives in a `.env` file (gitignored) that `docker compose` reads automatically; `.env.example` documents every variable. Authentication is **on by default** — a fresh `docker compose up` will refuse to start the API until `AUTH_PASSWORD` and `AUTH_SECRET` are set, or `AUTH_DISABLED=true` is given for trusted-LAN use. Set `DEMO_DATA=true` to seed a fictional demo dataset on the database's first boot.
+**Configuration** lives in a `.env` file (gitignored) that `docker compose` reads automatically; `.env.example` and the README table document every variable. Required secrets have no defaults and fail fast: `docker compose` won't start without `POSTGRES_PASSWORD`, and the API exits at startup if `DB_PASSWORD` is missing or (with auth enabled) `AUTH_PASSWORD`/`AUTH_SECRET` are unset. Auth is **on by default**; use `AUTH_DISABLED=true` for trusted-LAN use. Set `DEMO_DATA=true` to seed a fictional demo dataset on the database's first boot.
 
-## Local development (without Docker)
+## Local development
+
+Two options:
 
 ```bash
-# API
-cd api && npm install && npm run dev   # node --watch, restarts on file changes
-
-# Web
-cd web && npm install && npm run dev   # Vite dev server on :5173
+# 1. Full stack in Docker with hot reload + API exposed on the host
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-The web dev server proxies `/api` requests to `API_TARGET` (default `http://api:3000`). For local dev without Docker, set `API_TARGET=http://localhost:3000` or rely on the default and run the API separately.
+The dev override (`docker-compose.dev.yml`) swaps the web container to the Vite dev server (still on 8080), mounts source for live editing, runs the API with `node --watch`, and publishes the API on `API_PORT`.
 
-The database runs in Docker even during local dev:
 ```bash
+# 2. Services directly on your machine (DB still in Docker)
 docker compose up db
+cd api && npm install && DB_PASSWORD=... npm run dev   # requires DB_PASSWORD set
+cd web && npm install && npm run dev                   # Vite dev server on :5173
 ```
+
+For option 2 the web dev server proxies `/api` to `API_TARGET` (default `http://api:3000`); set `API_TARGET=http://localhost:3000` when running the API on the host.
 
 ## Architecture
 
@@ -44,7 +48,7 @@ Three services in `docker-compose.yml`:
 
 - **`db`** — Postgres 16. Schema and generic starter categories initialised from `db/init.sql` on first run (via `docker-entrypoint-initdb.d`); a fresh install has no balance/projects/transactions. `db/demo-seed.sh` optionally seeds a fictional demo dataset (relative dates) when `DEMO_DATA=true`. Persistent volume `postgres_data` — note init scripts only run when this volume is empty. Mounted as `01-init.sql` / `02-demo-seed.sh` so ordering is deterministic.
 - **`api`** — Express app (`api/src/index.js`). Connects to Postgres via `pg` Pool (`api/src/db.js`). Routes in `api/src/routes/` — one file per resource: `balance`, `categories`, `dashboard`, `projects`, `transactions`. Auth lives in `api/src/auth.js`.
-- **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes.
+- **`web`** — React + Vite SPA (`web/src/`). Tailwind CSS + Recharts. `web/src/api.js` is the sole HTTP client (thin wrapper around `fetch`). Pages in `web/src/pages/` map 1-to-1 to nav items and API routes. Built by a multi-stage `web/Dockerfile` (`build` → nginx `production`; a `dev` stage runs the Vite server for the dev override). All three services have healthchecks; `api` exposes an unauthenticated `GET /api/health` for its probe.
 
 ## Key design details
 

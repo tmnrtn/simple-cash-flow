@@ -2,9 +2,10 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: cashflow
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-cashflow}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # Required — no default. Set POSTGRES_PASSWORD in .env (see .env.example).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}
       # Set to true to seed a fictional demo dataset on first boot.
       DEMO_DATA: ${DEMO_DATA:-false}
     volumes:
@@ -12,8 +13,9 @@ services:
       # Numeric prefixes control init order: schema first, then optional demo seed.
       - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./db/demo-seed.sh:/docker-entrypoint-initdb.d/02-demo-seed.sh
+    # Not published to the host — only reachable by other services on the network.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-cashflow}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,10 +25,10 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: cashflow
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      PORT: ${API_PORT:-3000}
+      DB_NAME: ${POSTGRES_DB:-cashflow}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}
+      PORT: 3000
       # Authentication (see .env.example). Auth is ON by default: set
       # AUTH_PASSWORD and AUTH_SECRET, or AUTH_DISABLED=true for trusted LANs.
       AUTH_DISABLED: ${AUTH_DISABLED:-false}
@@ -34,20 +36,35 @@ services:
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:-}
       AUTH_SECRET: ${AUTH_SECRET:-}
-    ports:
-      - "${API_PORT:-3000}:${API_PORT:-3000}"
+    # Not published to the host — the web container reverse-proxies /api to it.
+    # Use docker-compose.dev.yml to expose it for direct access during development.
+    healthcheck:
+      test:
+        ["CMD", "node", "-e",
+         "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       db:
         condition: service_healthy
 
   web:
-    build: ./web
-    environment:
-      API_TARGET: http://api:${API_PORT:-3000}
+    build:
+      context: ./web
+      target: production
     ports:
-      - "${WEB_PORT:-5173}:5173"
+      - "${WEB_PORT:-8080}:8080"
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only and localhost
+      # resolves to ::1 first inside the container.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:
