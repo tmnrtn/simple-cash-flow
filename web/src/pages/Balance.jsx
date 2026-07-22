@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import Modal from '../components/Modal';
 import { formatCurrency } from '../format';
+import { toCsv, downloadCsv } from '../csv';
 
 const empty = { balance_date: '', balance_amount: '' };
 
@@ -59,12 +60,32 @@ export default function Balance() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-gray-800">Balance</h1>
-        <button
-          onClick={openAdd}
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-        >
-          + Add
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() =>
+              downloadCsv(
+                'balances.csv',
+                toCsv(
+                  ['balance_date', 'balance_amount'],
+                  rows.map((r) => ({
+                    balance_date: fmt(r.balance_date),
+                    balance_amount: r.balance_amount,
+                  }))
+                )
+              )
+            }
+            disabled={rows.length === 0}
+            className="px-3 py-1.5 border text-gray-700 text-sm rounded hover:bg-gray-50 disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={openAdd}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+          >
+            + Add
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

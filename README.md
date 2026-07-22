@@ -120,6 +120,31 @@ docker compose exec -T db psql -U postgres cashflow < backup.sql
 
 Adjust the user/database if you changed `POSTGRES_USER` / `POSTGRES_DB`.
 
+## CSV import & export
+
+The **Transactions** page has **Export CSV** and **Import CSV** buttons (the
+**Balance** page can export too). Import parses the file, lets you adjust the
+column mapping, and shows a per-row validation preview before importing the
+valid rows. An export re-imports cleanly.
+
+Transaction CSV columns (a header row is required; order doesn't matter, and
+extra columns are ignored):
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| `type` | yes | `income` or `expense`. |
+| `amount` | yes | Positive number. |
+| `due_date` | yes | `YYYY-MM-DD`. |
+| `counterparty` | no | Free text. |
+| `description` | no | Free text. |
+| `category` | no | Must match an existing category **name**. |
+| `project` | no | Must match an existing project **name**. |
+| `recurrence` | no | `weekly`, `monthly`, `quarterly`, or `annually`. |
+| `recurrence_end` | no | `YYYY-MM-DD`; requires `recurrence`. |
+
+Rows that fail validation are listed with the reason and skipped; the rest are
+imported.
+
 ## Development
 
 Run the full stack from source with hot reloading (Vite dev server + API
