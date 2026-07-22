@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import Modal from '../components/Modal';
+import { formatCurrency } from '../format';
 
 const empty = { balance_date: '', balance_amount: '' };
 
@@ -79,10 +80,7 @@ export default function Balance() {
             {rows.map((row) => (
               <tr key={row.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">{fmt(row.balance_date)}</td>
-                <td className="px-4 py-3 text-right">
-                  £
-                  {Number(row.balance_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                </td>
+                <td className="px-4 py-3 text-right">{formatCurrency(row.balance_amount)}</td>
                 <td className="px-4 py-3 text-right space-x-2">
                   <button onClick={() => openEdit(row)} className="text-blue-600 hover:underline">
                     Edit

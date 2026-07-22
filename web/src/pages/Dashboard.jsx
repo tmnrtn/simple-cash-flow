@@ -11,12 +11,10 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { api } from '../api';
+import { formatCurrency as money, formatCurrencyCompact } from '../format';
 
 function fmt(date) {
   return date ? date.slice(0, 10) : '';
-}
-function gbp(n) {
-  return `£${Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
 }
 
 function pivot(rows, labelKey, weekCount, allWeekEnds) {
@@ -84,21 +82,21 @@ function PivotTable({ title, rows, labelKey, weekCount, allWeekEnds }) {
                   const v = lookup[`${w}__${name}`];
                   return (
                     <td key={w} className="px-3 py-2 text-right">
-                      {v ? gbp(v) : ''}
+                      {v ? money(v) : ''}
                     </td>
                   );
                 })}
-                <td className="px-3 py-2 text-right font-medium">{gbp(rowTotals[name])}</td>
+                <td className="px-3 py-2 text-right font-medium">{money(rowTotals[name])}</td>
               </tr>
             ))}
             <tr className="bg-gray-50 font-semibold border-t">
               <td className="px-3 py-2 sticky left-0 bg-gray-50">Grand Total</td>
               {weeks.map((w) => (
                 <td key={w} className="px-3 py-2 text-right">
-                  {colTotals[w] ? gbp(colTotals[w]) : ''}
+                  {colTotals[w] ? money(colTotals[w]) : ''}
                 </td>
               ))}
-              <td className="px-3 py-2 text-right">{gbp(grandTotal)}</td>
+              <td className="px-3 py-2 text-right">{money(grandTotal)}</td>
             </tr>
           </tbody>
         </table>
@@ -149,7 +147,7 @@ function BalanceTable({ balances }) {
                       key={b.week_number}
                       className={`px-3 py-2 text-right ${neg ? 'bg-red-100 text-red-700' : ''}`}
                     >
-                      {gbp(v)}
+                      {money(v)}
                     </td>
                   );
                 })}
@@ -169,7 +167,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     <div className="bg-white border rounded shadow px-3 py-2 text-sm">
       <p className="text-gray-500">{label}</p>
       <p className={v < 0 ? 'text-red-600 font-semibold' : 'text-blue-600 font-semibold'}>
-        {gbp(v)}
+        {money(v)}
       </p>
     </div>
   );
@@ -234,7 +232,7 @@ export default function Dashboard() {
               textAnchor="end"
               height={50}
             />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `£${(v / 1000).toFixed(1)}k`} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={formatCurrencyCompact} />
             <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 2" />
             <Tooltip content={<CustomTooltip />} />
             <Line

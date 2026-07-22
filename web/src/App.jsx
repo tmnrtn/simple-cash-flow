@@ -7,6 +7,7 @@ import Projects from './pages/Projects';
 import Categories from './pages/Categories';
 import Login from './pages/Login';
 import { api } from './api';
+import { setCurrencyConfig } from './format';
 
 function Nav({ authDisabled, onLogout }) {
   const base = 'px-4 py-2 text-sm font-medium transition-colors';
@@ -57,6 +58,7 @@ function Nav({ authDisabled, onLogout }) {
 export default function App() {
   // auth: null while checking, otherwise { authenticated, authDisabled }
   const [auth, setAuth] = useState(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   const refreshAuth = useCallback(() => {
     api
@@ -67,6 +69,12 @@ export default function App() {
 
   useEffect(() => {
     refreshAuth();
+    // Load currency/locale config (public endpoint) before rendering pages.
+    api
+      .get('/api/config')
+      .then(setCurrencyConfig)
+      .catch(() => {})
+      .finally(() => setConfigLoaded(true));
     const onUnauthorized = () => setAuth({ authenticated: false, authDisabled: false });
     window.addEventListener('auth:unauthorized', onUnauthorized);
     return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
@@ -81,7 +89,7 @@ export default function App() {
     setAuth({ authenticated: false, authDisabled: false });
   }
 
-  if (auth === null) {
+  if (auth === null || !configLoaded) {
     return <p className="text-gray-400 py-16 text-center">Loading…</p>;
   }
 

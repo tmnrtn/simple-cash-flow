@@ -42,6 +42,9 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-}
       # Seed a fictional demo dataset on a fresh (empty) database.
       DEMO_DATA: ${DEMO_DATA:-false}
+      # Currency/locale for number formatting in the UI (LOCALE blank = browser).
+      CURRENCY: ${CURRENCY:-GBP}
+      LOCALE: ${LOCALE:-}
     # Not published to the host — the web container reverse-proxies /api to it.
     # Use docker-compose.dev.yml to expose it for direct access during development.
     healthcheck:

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import Modal from '../components/Modal';
+import { formatCurrency } from '../format';
 
 const empty = {
   is_income: true,
@@ -195,8 +196,8 @@ export default function Transactions() {
                   <td
                     className={`px-4 py-3 text-right ${paid ? 'line-through text-gray-400' : row.is_income ? 'text-green-700' : 'text-red-700'}`}
                   >
-                    {row.is_income ? '+' : '-'}£
-                    {Number(row.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                    {row.is_income ? '+' : '-'}
+                    {formatCurrency(row.amount)}
                   </td>
                   <td className={`px-4 py-3 ${paid ? 'text-gray-400' : ''}`}>
                     {fmt(row.due_date)}

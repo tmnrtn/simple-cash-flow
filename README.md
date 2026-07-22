@@ -62,6 +62,8 @@ Compose. See [`.env.example`](.env.example) for the annotated list.
 | `AUTH_USERNAME` | `admin` | no | Login username. |
 | `AUTH_DISABLED` | `false` | no | Set `true` to disable auth entirely (trusted LAN only). |
 | `DEMO_DATA` | `false` | no | Seed a fictional demo dataset into a fresh (empty) database. |
+| `CURRENCY` | `GBP` | no | ISO 4217 currency code for amounts shown in the UI (e.g. `USD`, `EUR`). |
+| `LOCALE` | browser | no | BCP 47 locale for number formatting (e.g. `en-US`). Blank uses the viewer's browser locale. |
 | `WEB_PORT` | `8080` | no | Host port for the web app. |
 | `API_PORT` | `3000` | no | Host port for the API — development only (see below). |
 | `IMAGE_TAG` | `latest` | no | Published image tag to run (`latest`, a version like `1.2.3`, or `edge`). |

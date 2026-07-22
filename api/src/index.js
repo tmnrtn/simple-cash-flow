@@ -18,6 +18,12 @@ app.use(express.json());
 // Unauthenticated liveness probe for container healthchecks.
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+// Public runtime config for the frontend (currency/locale). An empty locale
+// tells the client to use the browser's locale.
+app.get('/api/config', (req, res) =>
+  res.json({ currency: process.env.CURRENCY || 'GBP', locale: process.env.LOCALE || null })
+);
+
 // Public auth endpoints (login / logout / me).
 app.use('/api/auth', authRouter);
 
