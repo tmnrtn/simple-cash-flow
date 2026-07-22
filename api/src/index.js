@@ -25,5 +25,10 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/balance', require('./routes/balance'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
+// Only start listening when run directly, so tests can import the app.
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
+}
+
+module.exports = app;

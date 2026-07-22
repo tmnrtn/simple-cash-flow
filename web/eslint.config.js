@@ -30,10 +30,24 @@ module.exports = [
     files: ['*.config.js', 'vite.config.js', 'postcss.config.js', 'tailwind.config.js'],
     languageOptions: { globals: { ...globals.node } },
   },
-  // Vitest test files.
+  // Vitest test files (globals: true) + setup.
   {
     files: ['**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}'],
-    languageOptions: { globals: { ...globals.node } },
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        vi: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+      },
+    },
   },
   prettier,
 ];
