@@ -11,6 +11,9 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
+// Unauthenticated liveness probe for container healthchecks.
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
 // Public auth endpoints (login / logout / me).
 app.use('/api/auth', authRouter);
 
