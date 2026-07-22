@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 
@@ -149,6 +150,22 @@ export default function Dashboard() {
   if (!data) return null;
 
   const { balances, receipts, payments } = data;
+
+  if (!balances.length) {
+    return (
+      <div className="max-w-md mx-auto text-center py-16">
+        <h1 className="text-xl font-semibold text-gray-800 mb-2">No forecast yet</h1>
+        <p className="text-gray-500 mb-6">
+          The 13-week projection starts from your latest balance. Add your current
+          bank balance to begin forecasting.
+        </p>
+        <Link to="/balance" className="inline-block bg-blue-900 text-white rounded px-4 py-2 text-sm font-medium hover:bg-blue-800">
+          Add a balance
+        </Link>
+      </div>
+    );
+  }
+
   const chartData = balances.map(b => ({ week: fmt(b.week_end), balance: Number(b.end_balance) }));
   const allWeekEnds = Object.fromEntries(balances.map(b => [b.week_number, fmt(b.week_end)]));
 

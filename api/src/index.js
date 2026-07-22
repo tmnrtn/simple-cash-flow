@@ -1,10 +1,21 @@
 const express = require('express');
 const cors = require('cors');
+const { router: authRouter, authMiddleware, assertAuthConfig } = require('./auth');
+
+assertAuthConfig();
 
 const app = express();
+// Trust the reverse proxy (web container / ingress) so req.secure and req.ip
+// reflect the original client via X-Forwarded-* headers.
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
+// Public auth endpoints (login / logout / me).
+app.use('/api/auth', authRouter);
+
+// Everything below requires a valid session (unless AUTH_DISABLED=true).
+app.use(authMiddleware);
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/transactions', require('./routes/transactions'));
