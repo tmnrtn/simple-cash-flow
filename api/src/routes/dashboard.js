@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
+const { asyncHandler } = require('../http');
 
 // Expands non-recurring (unpaid only) and monthly-recurring transactions into
 // dated entries within the 13-week projection window.
@@ -30,16 +31,18 @@ const entriesCte = `
   )
 `;
 
-router.get('/', async (req, res) => {
-  // The projection is anchored to the most recent balance snapshot. With no
-  // balance on record there is nothing to project from, so return empty
-  // results and let the UI show an onboarding hint instead of a broken chart.
-  const { rows: balanceRows } = await db.query('SELECT 1 FROM balance LIMIT 1');
-  if (!balanceRows.length) {
-    return res.json({ balances: [], receipts: [], payments: [] });
-  }
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    // The projection is anchored to the most recent balance snapshot. With no
+    // balance on record there is nothing to project from, so return empty
+    // results and let the UI show an onboarding hint instead of a broken chart.
+    const { rows: balanceRows } = await db.query('SELECT 1 FROM balance LIMIT 1');
+    if (!balanceRows.length) {
+      return res.json({ balances: [], receipts: [], payments: [] });
+    }
 
-  const balancesQuery = `
+    const balancesQuery = `
     WITH ${entriesCte},
     weeks AS (SELECT generate_series(1, 13) AS wk),
     income_weekly AS (
@@ -73,7 +76,7 @@ router.get('/', async (req, res) => {
     ORDER BY wn.week_number
   `;
 
-  const receiptsQuery = `
+    const receiptsQuery = `
     WITH ${entriesCte}
     SELECT
       (effective_date - params.start_date) / 7 + 1 AS week_number,
@@ -87,7 +90,7 @@ router.get('/', async (req, res) => {
     ORDER BY 1, 3
   `;
 
-  const paymentsQuery = `
+    const paymentsQuery = `
     WITH ${entriesCte}
     SELECT
       (e.effective_date - params.start_date) / 7 + 1 AS week_number,
@@ -102,17 +105,18 @@ router.get('/', async (req, res) => {
     ORDER BY 1, 3
   `;
 
-  const [balances, receipts, payments] = await Promise.all([
-    db.query(balancesQuery),
-    db.query(receiptsQuery),
-    db.query(paymentsQuery),
-  ]);
+    const [balances, receipts, payments] = await Promise.all([
+      db.query(balancesQuery),
+      db.query(receiptsQuery),
+      db.query(paymentsQuery),
+    ]);
 
-  res.json({
-    balances: balances.rows,
-    receipts: receipts.rows,
-    payments: payments.rows,
-  });
-});
+    res.json({
+      balances: balances.rows,
+      receipts: receipts.rows,
+      payments: payments.rows,
+    });
+  })
+);
 
 module.exports = router;
