@@ -38,18 +38,27 @@ const entriesCte = `
     WHERE t.recurrence IN ('weekly', 'monthly', 'quarterly', 'annually')
       AND occ::date >= params.start_date
       AND (t.recurrence_end IS NULL OR occ::date <= t.recurrence_end)
+      -- Occurrences the user has marked handled (paid/skipped) are excluded.
+      AND NOT EXISTS (
+        SELECT 1 FROM recurrence_exception re
+        WHERE re.transaction_id = t.id AND re.occurrence_date = occ::date
+      )
   )
 `;
 
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    // The projection is anchored to the most recent balance snapshot. With no
-    // balance on record there is nothing to project from, so return empty
-    // results and let the UI show an onboarding hint instead of a broken chart.
-    const { rows: balanceRows } = await db.query('SELECT 1 FROM balance LIMIT 1');
-    if (!balanceRows.length) {
-      return res.json({ balances: [], receipts: [], payments: [] });
+    // The projection is anchored to the most recent balance snapshot; expose
+    // that anchor so the UI can warn when it has gone stale. With no balance
+    // on record there is nothing to project from, so return empty results and
+    // let the UI show an onboarding hint instead of a broken chart.
+    const { rows: anchorRows } = await db.query(
+      "SELECT to_char(MAX(balance_date), 'YYYY-MM-DD') AS start_date FROM balance"
+    );
+    const startDate = anchorRows[0].start_date;
+    if (!startDate) {
+      return res.json({ start_date: null, balances: [], receipts: [], payments: [] });
     }
 
     const balancesQuery = `
@@ -122,6 +131,7 @@ router.get(
     ]);
 
     res.json({
+      start_date: startDate,
       balances: balances.rows,
       receipts: receipts.rows,
       payments: payments.rows,
