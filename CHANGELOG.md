@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/tmnrtn/simple-cash-flow/compare/v1.1.0...v1.2.0) (2026-07-22)
+
+
+### Features
+
+* list recurring transactions by their next due date ([e3c55f7](https://github.com/tmnrtn/simple-cash-flow/commit/e3c55f7e1e6d05238bf7dc0932d95ca94428a1b0))
+* list recurring transactions by their next due date ([22d3903](https://github.com/tmnrtn/simple-cash-flow/commit/22d39032ae407804dbc53b5fbe91ac2490d36c4f))
+
 ## [1.1.0](https://github.com/tmnrtn/simple-cash-flow/compare/v1.0.0...v1.1.0) (2026-07-22)
 
 
