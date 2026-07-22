@@ -60,4 +60,16 @@ The web package also has `npm run build` (Vite production build), which CI runs.
 
 Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`,
 `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, etc. This keeps history
-readable and supports automated release notes.
+readable and drives automated releases (below). `feat:` bumps the minor
+version, `fix:` the patch; a `!` or `BREAKING CHANGE:` footer bumps major.
+
+## Releases
+
+Releases are automated with
+[release-please](https://github.com/googleapis/release-please). It watches
+`main` and keeps an open "release PR" that accumulates the changelog and the
+next version from the Conventional Commits since the last release. **Merging
+that release PR** creates the GitHub Release and the `vX.Y.Z` tag, bumps the
+version in both `package.json` files, and — in the same workflow — builds and
+pushes the versioned + `latest` multi-arch images to GHCR. Every push to `main`
+also refreshes the `edge` images. Maintainers don't tag or publish by hand.

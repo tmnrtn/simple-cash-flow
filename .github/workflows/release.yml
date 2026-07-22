@@ -1,16 +1,37 @@
-name: Publish images
+name: Release
+
+# release-please maintains a release PR from Conventional Commits; merging it
+# creates the GitHub Release + tag and bumps versions. The publish job runs on
+# every push to main to refresh the :edge images, and additionally pushes the
+# versioned + :latest images when a release was just created. Keeping both in
+# one workflow avoids the "GITHUB_TOKEN-created tag doesn't trigger workflows"
+# limitation.
 
 on:
   push:
-    branches: [main] # publishes the :edge tag
-    tags: ['v*.*.*'] # publishes semver tags + :latest
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
   packages: write
 
 jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      version: ${{ steps.rp.outputs.version }}
+      major: ${{ steps.rp.outputs.major }}
+      minor: ${{ steps.rp.outputs.minor }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   publish:
+    needs: release-please
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -42,11 +63,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          # :edge always; version / major.minor / :latest only on a release.
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=edge,enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=edge
+            type=raw,value=${{ needs.release-please.outputs.version }},enable=${{ needs.release-please.outputs.release_created == 'true' }}
+            type=raw,value=${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }},enable=${{ needs.release-please.outputs.release_created == 'true' }}
+            type=raw,value=latest,enable=${{ needs.release-please.outputs.release_created == 'true' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
