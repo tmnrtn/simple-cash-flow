@@ -1,17 +1,6 @@
-#!/bin/sh
-# Optional demo dataset. Runs during first-boot DB initialisation (after
-# init.sql), but only when DEMO_DATA=true. All data below is fictional and
-# uses dates relative to CURRENT_DATE so the 13-week projection always has
-# something to show.
-set -e
-
-if [ "$DEMO_DATA" != "true" ]; then
-  exit 0
-fi
-
-echo "DEMO_DATA=true — seeding fictional demo dataset"
-
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'EOSQL'
+-- Optional demo dataset (fictional). Loaded by the API on startup when
+-- DEMO_DATA=true and the database has no balance yet. Dates are relative to
+-- CURRENT_DATE so the 13-week projection always has something to show.
 INSERT INTO project (name) VALUES ('Website Redesign'), ('Mobile App');
 
 INSERT INTO balance (balance_date, balance_amount) VALUES (CURRENT_DATE, 12500);
@@ -27,6 +16,3 @@ INSERT INTO transaction (is_income, counterparty, description, amount, due_date,
   (FALSE, 'Landlord',      'Office rent',     1500, CURRENT_DATE + 3,  (SELECT id FROM category WHERE name = 'Rent/Office'), NULL,                                              FALSE, 'monthly'),
   (FALSE, 'HMRC',          'VAT return',      2800, CURRENT_DATE + 45, (SELECT id FROM category WHERE name = 'VAT/Tax'),     NULL,                                              FALSE, NULL),
   (FALSE, 'Freelance Dev', 'Contract work',   1800, CURRENT_DATE + 20, (SELECT id FROM category WHERE name = 'Contractor'),  (SELECT id FROM project WHERE name = 'Mobile App'), FALSE, NULL);
-EOSQL
-
-echo "Demo dataset loaded"

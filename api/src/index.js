@@ -1,5 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const db = require('./db');
+const { migrate } = require('./migrate');
+const { maybeSeedDemo } = require('./seed');
 const { router: authRouter, authMiddleware, assertAuthConfig } = require('./auth');
 
 assertAuthConfig();
@@ -25,10 +28,20 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/balance', require('./routes/balance'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
-// Only start listening when run directly, so tests can import the app.
-if (require.main === module) {
+// Run pending migrations (and optional demo seed) before serving traffic.
+async function start() {
+  await migrate(db);
+  await maybeSeedDemo(db);
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
+}
+
+// Only start when run directly, so tests can import the app and control setup.
+if (require.main === module) {
+  start().catch((err) => {
+    console.error('Failed to start:', err.message);
+    process.exit(1);
+  });
 }
 
 module.exports = app;
