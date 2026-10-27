@@ -39,6 +39,7 @@ npm run lint          # ESLint
 npm run format:check  # Prettier (use `npm run format` to auto-fix)
 npm test              # api: node --test (needs Docker for testcontainers)
                       # web: vitest
+npm run test:coverage # same, also writing coverage/lcov.info (used by SonarQube)
 ```
 
 The web package also has `npm run build` (Vite production build), which CI runs.

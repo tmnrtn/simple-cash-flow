@@ -176,6 +176,30 @@ cd web && npm install && npm run dev
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for linting, formatting, and tests, and
 [`CLAUDE.md`](CLAUDE.md) for a deeper tour of the architecture.
 
+## SonarQube
+
+Each push to main is analysed on the self-hosted SonarQube server
+(`.github/workflows/sonarqube.yml`), with coverage from both packages. The
+workflow runs `scripts/sonar.sh`, which can be run locally too (with both
+packages' dependencies installed and Docker running), taking the server's
+address and token from `sonar.env`, with the token read from 1Password:
+
+```sh
+op run --env-file sonar.env -- scripts/sonar.sh
+```
+
+Pull requests are not analysed: the server is Community Edition, which
+analyses one branch. What is analysed, and what is left out of coverage, is in
+`sonar-project.properties`.
+
+CI needs the same two values as the repository secrets `SONAR_HOST_URL` and
+`SONAR_TOKEN`:
+
+```sh
+gh secret set SONAR_HOST_URL --body https://sq.tmnrtn.com
+op read op://Homelab/sonarqube/SONAR_TOKEN | gh secret set SONAR_TOKEN
+```
+
 ## License
 
 [MIT](LICENSE)

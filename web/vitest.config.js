@@ -7,5 +7,11 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setup.js',
+    // `npm run test:coverage` writes coverage/lcov.info for SonarQube.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**'],
+      reporter: ['text', 'lcovonly'],
+    },
   },
 });

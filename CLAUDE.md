@@ -82,4 +82,6 @@ cd web && npm run lint && npm run format:check && npm test
 - **API tests** (`api/test/`, Node's built-in `node --test`): `auth.test.js` unit-tests `auth.js` with no DB; `api.test.js` is an integration test that spins up a real Postgres via **testcontainers** (needs a Docker daemon), runs the migrations via `migrate()`, and exercises CRUD plus the dashboard projection (recurrence expansion, paid exclusion, running balance, empty state) and migration idempotency. `api/src/index.js` exports the Express `app` and only calls `listen()` when run directly, so tests can import it.
 - **Web tests** (`*.test.jsx`, **Vitest** + Testing Library, jsdom via `vitest.config.js` + `src/test/setup.js`): cover the login form and the dashboard empty/populated states. The api client is mocked with `vi.mock`.
 
+- **Coverage / SonarQube**: each package has `test:coverage`, writing `coverage/lcov.info`. `scripts/sonar.sh` runs both and sends the analysis to the self-hosted SonarQube server (`sq.tmnrtn.com`, project `tmnrtn_simple-cash-flow`, config in `sonar-project.properties`); `.github/workflows/sonarqube.yml` runs it on every push to main. Locally: `op run --env-file sonar.env -- scripts/sonar.sh`.
+
 Still verify end-to-end changes by running the app (`docker compose up --build`).
